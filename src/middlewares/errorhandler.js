@@ -34,16 +34,12 @@ module.exports.ReS = function (res, data, code) {
     return res.json(send_data)
 }
 
+function isNull(field) {
+  return typeof field === "undefined" || field === "" || field === null || field === "null"
+}
 
-const isNull = (field) => {
-    return (
-      typeof field === "undefined" ||
-      field === undefined ||
-      field === "" ||
-      field === null
-    );
-  }
-  module.exports.isNull = isNull;
+module.exports.isNull = isNull;
+
   const undefined = (field) => {
     return (
       typeof field === "undefined" ||

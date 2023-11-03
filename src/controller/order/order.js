@@ -1,28 +1,46 @@
-const Order = require('../../models/ordermodel')
+const {Order} = require('../../models/ordermodel')
 const HttpStatus = require('http-status')
-const { to, ReE, ReS, undefined,isNull} = require('../../middlewares/errorhandler')
+const { to, ReE, ReS,isNull, isEmpty} = require('../../middlewares/errorhandler')
+const { isObjectIdOrHexString } = require('mongoose')
 
 module.exports.createorder = async (req, res) => {
-    const orderId = req.body.orderId
+    const {orderId,orderStatus} = req.body
+    
+    //request body to validat the value
+    if(isNull(orderId)){
+        return ReE( res,{ message: 'please enter a valid orderId' }, HttpStatus.BAD_REQUEST)
+    }
+    
+    var statusType = ['booked','inprogress','complete']
+    statusType.forEach((i)=>{
+      if(isNull && !statusType.includes(i)){
+        return ReE( res,{ message: 'Request order status type is invaild' }, HttpStatus.BAD_REQUEST)
+      }
+    })
+
     // the orderId validation
     let findOrder;
-    [err, findOrder] = await to(Order.findOne({orderId:orderId}));
+    [err, findOrder] = await to(Order.find({orderId:orderId,active:true}));
     if(err){
         return ReE(res, err, HttpStatus.INTERNAL_SERVER_ERROR)
     }
-    if(undefined(findOrder)) {
-        return ReE(res, { message : `Request orderId is not found`}, HttpStatus.BAD_REQUEST)
-      }
-    if(findOrder){
+    if(!isEmpty(findOrder)){
         return ReE( res,{ message: 'Request orderId is already register' }, HttpStatus.BAD_REQUEST)
     }
   //order insert
   let newOrder;
-  [err, newOrder] = await to(Order.create(req.body)); 
+
+  const NewOrder = new Order({orderId:orderId,orderStatus:orderStatus})
+  
+  [err, newOrder] = await to(NewOrder.save()); 
   if(err){
       return ReE(res, err, HttpStatus.INTERNAL_SERVER_ERROR)
-  }else{
-      return ReS(res,{ message: 'Cart found successfully', order: newOrder }, HttpStatus.OK )
+  }
+  if(isNull(newOrder)){
+    return ReE( res,{ message: 'Cannot create a new order' }, HttpStatus.BAD_REQUEST)
+  }
+  if(!isNull(newOrder)){
+      return ReS(res,{ message: 'order created successfully', order: newOrder }, HttpStatus.OK )
   }
 }
 // Get all order
@@ -54,12 +72,39 @@ module.exports.getSingleOrder = async (req, res) => {
 
 //update the order
 module.exports.updateOrder = async (req, res) => {
-    const { id } = req.params
-    let updateOrder;
-    [err, updateOrder] = await to(Order.findByIdAndUpdate(id, {orderStatus: req?.body?.orderStatus },{new: true})); 
+    const { id } = req.params;
+    const{orderId,orderStatus} = req.body;
+    if(!isObjectIdOrHexString(id)){
+        return ReE(res,{message:"select a vaild id"}, HttpStatus.INTERNAL_SERVER_ERROR) 
+    }
+    
+    var statusType = ['booked','inprogress','complete']
+    statusType.forEach((i)=>{
+      if(isNull && !statusType.includes(i)){
+        return ReE( res,{ message: 'Request order status type is invaild' }, HttpStatus.BAD_REQUEST)
+      }
+    })
+
+    
+    let existingOrder;
+    [err, existingOrder] = await to(Order.findOne({_id:id,active:true})); 
     if(err){
         return ReE(res, err, HttpStatus.INTERNAL_SERVER_ERROR)
-    }else{
+    }
+    if(isNull(existingOrder)){
+        return ReE(res,{message:"order doesnot exists"}, HttpStatus.INTERNAL_SERVER_ERROR)
+    }
+
+    let updateOrder;
+    [err, updateOrder] = await to(Order.updateOne({_id:id},{$set:{orderId:orderId,orderStatus:orderStatus,active:true}})); 
+    if(err){
+        return ReE(res, err, HttpStatus.INTERNAL_SERVER_ERROR)
+    }
+    if(updateOrder.modifiedCount == 0){
+        return ReE(res,{message:"order cannot update"}, HttpStatus.INTERNAL_SERVER_ERROR)
+    }
+    if(updateOrder.modifiedCount > 0)
+    {
         return ReS(res,{ message: 'Upgrade the order details is successfully', updateorder: updateOrder }, HttpStatus.OK )
     }
 }
@@ -67,12 +112,32 @@ module.exports.updateOrder = async (req, res) => {
 //delete the order
 module.exports.deleteOrder = async (req, res) => {
     const { id } = req.params
-    let deleteOrder;
-    [err, deleteOrder] = await to(Order.findByIdAndDelete({id})); 
+    
+    if(!isObjectIdOrHexString(id)){
+        return ReE(res,{message:"select a vaild id"}, HttpStatus.INTERNAL_SERVER_ERROR) 
+    }
+
+    let existingOrder;
+    [err, existingOrder] = await to(Order.findOne({_id:id,active:true})); 
     if(err){
         return ReE(res, err, HttpStatus.INTERNAL_SERVER_ERROR)
-    }else{
-        return ReS(res,{ message: 'Remove order details is successfully', deleteorder: deleteOrder }, HttpStatus.OK )
+    }
+    if(isNull(existingOrder)){
+        return ReE(res,{message:"order doesnot exists"}, HttpStatus.INTERNAL_SERVER_ERROR)
+    }
+
+    // delete the element
+    let deleteOrder;
+    [err, deleteOrder] = await to(Order.updateOne({_id:id},{$set:{active:false}})); 
+    if(err){
+        return ReE(res, err, HttpStatus.INTERNAL_SERVER_ERROR)
+    }
+    if(deleteOrder.modifiedCount == 0){
+        return ReE(res,{message:"order cannot delete"}, HttpStatus.INTERNAL_SERVER_ERROR)
+    }
+    if(deleteOrder.modifiedCount > 0)
+    {
+        return ReS(res,{ message: 'Remove order details is successfully'}, HttpStatus.OK )
     }
 }
 

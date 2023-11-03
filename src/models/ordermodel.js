@@ -10,8 +10,7 @@ var orderSchema = new mongoose.Schema(
         },
         orderStatus: {
             type: String,
-            required: true,
-            enum:['booked','inprogress','complete']
+            required: true
         },
         orderDate: {
             type: Date,
@@ -29,11 +28,10 @@ var orderSchema = new mongoose.Schema(
             type: Date,
             default: Date.now,
         },
-    },
-    {
+    },{
         timestamps: true,
     }
 )
 
 //Export the model
-module.exports = mongoose.model('Order', orderSchema)
+module.exports.Order = mongoose.model('Order', orderSchema)
